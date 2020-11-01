@@ -1,0 +1,44 @@
+# PHP CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-php/ for more details
+#
+version: 2
+jobs:
+  build:
+    docker:
+      # specify the version you desire here
+      - image: circleci/php:7.3.3-node-browsers
+
+    working_directory: ~/repo
+
+    steps:
+      - run: # start-up chromedriver in the background
+          command: chromedriver
+          background: true
+      - checkout
+
+      - run: sudo apt update
+      - run: sudo apt upgrade
+      - run: sudo apt install -y git libgmp3-dev libmcrypt-dev libxml2-dev libmcrypt-dev
+      - run: sudo apt install default-mysql-client
+      - run: sudo ln -s /usr/include/x86_64-linux-gnu/gmp.h /usr/include/gmp.h
+      - run: sudo docker-php-ext-install gmp xml mbstring pdo tokenizer dom pdo_mysql
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "composer.json" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-dependencies-
+
+      - run: sudo curl -sS https://getcomposer.org/installer | php -- --filename=composer
+      - run: composer install -n --prefer-dist
+
+      - save_cache:
+          paths:
+            - ./vendor
+          key: v1-dependencies-{{ checksum "composer.json" }}
+
+      # run tests!
+      - run: mv ./tests/.env.circle_ci ./tests/.env
+      - run: vendor/bin/phpunit -d memory_limit=512M --coverage-clover=coverage.xml
+      # - run: bash <(curl -s https://codecov.io/bash)
